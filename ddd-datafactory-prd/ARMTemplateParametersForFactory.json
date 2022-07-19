@@ -5,14 +5,14 @@
 		"factoryName": {
 			"value": "ddd-datafactory-prd"
 		},
-		"AzureFunction1_functionKey": {
-			"value": ""
+		"LS_FunctionApp_Param_properties_typeProperties_functionAppUrl": {
+			"value": "\n@{concat('https://', linkedService().FunctionAppName, '.azurewebsites.net')}"
 		},
-		"AzureDataLakeStorage1_properties_typeProperties_url": {
+		"LS_KeyVault_Param_properties_typeProperties_baseUrl": {
+			"value": "@{concat('https://', linkedService().KeyVaultName, '.vault.azure.net')}"
+		},
+		"LS_StorageAccount_Param_properties_typeProperties_url": {
 			"value": "@{concat('https://', linkedService().StorageAccount, '.dfs.core.windows.net')}"
-		},
-		"AzureFunction1_properties_typeProperties_functionAppUrl": {
-			"value": "https://ddd-metadatafunc-prd.azurewebsites.net"
 		}
 	}
 }

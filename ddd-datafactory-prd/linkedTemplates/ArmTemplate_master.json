@@ -7,17 +7,17 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "ddd-datafactory-prd"
 		},
-		"AzureFunction1_functionKey": {
-			"type": "secureString",
-			"metadata": "Secure string for 'functionKey' of 'AzureFunction1'"
+		"LS_FunctionApp_Param_properties_typeProperties_functionAppUrl": {
+			"type": "string",
+			"defaultValue": "\n@{concat('https://', linkedService().FunctionAppName, '.azurewebsites.net')}"
 		},
-		"AzureDataLakeStorage1_properties_typeProperties_url": {
+		"LS_KeyVault_Param_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "@{concat('https://', linkedService().KeyVaultName, '.vault.azure.net')}"
+		},
+		"LS_StorageAccount_Param_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "@{concat('https://', linkedService().StorageAccount, '.dfs.core.windows.net')}"
-		},
-		"AzureFunction1_properties_typeProperties_functionAppUrl": {
-			"type": "string",
-			"defaultValue": "https://ddd-metadatafunc-prd.azurewebsites.net"
 		},
 		"containerUri": {
 			"type": "string",
@@ -46,14 +46,14 @@
 					"factoryName": {
 						"value": "[parameters('factoryName')]"
 					},
-					"AzureFunction1_functionKey": {
-						"value": "[parameters('AzureFunction1_functionKey')]"
+					"LS_KeyVault_Param_properties_typeProperties_baseUrl": {
+						"value": "[parameters('LS_KeyVault_Param_properties_typeProperties_baseUrl')]"
 					},
-					"AzureDataLakeStorage1_properties_typeProperties_url": {
-						"value": "[parameters('AzureDataLakeStorage1_properties_typeProperties_url')]"
+					"LS_StorageAccount_Param_properties_typeProperties_url": {
+						"value": "[parameters('LS_StorageAccount_Param_properties_typeProperties_url')]"
 					},
-					"AzureFunction1_properties_typeProperties_functionAppUrl": {
-						"value": "[parameters('AzureFunction1_properties_typeProperties_functionAppUrl')]"
+					"LS_FunctionApp_Param_properties_typeProperties_functionAppUrl": {
+						"value": "[parameters('LS_FunctionApp_Param_properties_typeProperties_functionAppUrl')]"
 					}
 				}
 			},

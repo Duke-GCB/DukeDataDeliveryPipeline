@@ -7,17 +7,17 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "ddd-datafactory-prd"
 		},
-		"AzureFunction1_functionKey": {
-			"type": "secureString",
-			"metadata": "Secure string for 'functionKey' of 'AzureFunction1'"
+		"LS_FunctionApp_Param_properties_typeProperties_functionAppUrl": {
+			"type": "string",
+			"defaultValue": "\n@{concat('https://', linkedService().FunctionAppName, '.azurewebsites.net')}"
 		},
-		"AzureDataLakeStorage1_properties_typeProperties_url": {
+		"LS_KeyVault_Param_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "@{concat('https://', linkedService().KeyVaultName, '.vault.azure.net')}"
+		},
+		"LS_StorageAccount_Param_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "@{concat('https://', linkedService().StorageAccount, '.dfs.core.windows.net')}"
-		},
-		"AzureFunction1_properties_typeProperties_functionAppUrl": {
-			"type": "string",
-			"defaultValue": "https://ddd-metadatafunc-prd.azurewebsites.net"
 		}
 	},
 	"variables": {
@@ -149,8 +149,18 @@
 							}
 						},
 						"linkedServiceName": {
-							"referenceName": "AzureFunction1",
-							"type": "LinkedServiceReference"
+							"referenceName": "LS_FunctionApp_Param",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"FunctionAppName": {
+									"value": "@pipeline().globalParameters.DDD_FunctionApp",
+									"type": "Expression"
+								},
+								"KeyVaultName": {
+									"value": "@pipeline().globalParameters.DDD_KeyVault",
+									"type": "Expression"
+								}
+							}
 						}
 					},
 					{
@@ -340,7 +350,7 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/CoreProjectFolder')]",
 				"[concat(variables('factoryId'), '/datasets/CustomerProjectFolder')]",
-				"[concat(variables('factoryId'), '/linkedServices/AzureFunction1')]"
+				"[concat(variables('factoryId'), '/linkedServices/LS_FunctionApp_Param')]"
 			]
 		},
 		{
@@ -349,8 +359,14 @@
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"linkedServiceName": {
-					"referenceName": "AzureDataLakeStorage1",
-					"type": "LinkedServiceReference"
+					"referenceName": "LS_StorageAccount_Param",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"StorageAccount": {
+							"value": "@dataset().StorageAccount",
+							"type": "Expression"
+						}
+					}
 				},
 				"parameters": {
 					"FileSystem": {
@@ -380,7 +396,7 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+				"[concat(variables('factoryId'), '/linkedServices/LS_StorageAccount_Param')]"
 			]
 		},
 		{
@@ -389,8 +405,14 @@
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"linkedServiceName": {
-					"referenceName": "AzureDataLakeStorage1",
-					"type": "LinkedServiceReference"
+					"referenceName": "LS_StorageAccount_Param",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"StorageAccount": {
+							"value": "@dataset().StorageAccount",
+							"type": "Expression"
+						}
+					}
 				},
 				"parameters": {
 					"FileSystem": {
@@ -420,11 +442,67 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+				"[concat(variables('factoryId'), '/linkedServices/LS_StorageAccount_Param')]"
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/AzureDataLakeStorage1')]",
+			"name": "[concat(parameters('factoryName'), '/LS_FunctionApp_Param')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"FunctionAppName": {
+						"type": "string"
+					},
+					"KeyVaultName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureFunction",
+				"typeProperties": {
+					"functionAppUrl": "[parameters('LS_FunctionApp_Param_properties_typeProperties_functionAppUrl')]",
+					"functionKey": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_KeyVault_Param",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"KeyVaultName": {
+									"value": "@linkedService().KeyVaultName",
+									"type": "Expression"
+								}
+							}
+						},
+						"secretName": "ddd-functionapp-key"
+					},
+					"authentication": "Anonymous"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_KeyVault_Param')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_KeyVault_Param')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"KeyVaultName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('LS_KeyVault_Param_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_StorageAccount_Param')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -436,25 +514,7 @@
 				"annotations": [],
 				"type": "AzureBlobFS",
 				"typeProperties": {
-					"url": "[parameters('AzureDataLakeStorage1_properties_typeProperties_url')]"
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureFunction1')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureFunction",
-				"typeProperties": {
-					"functionAppUrl": "[parameters('AzureFunction1_properties_typeProperties_functionAppUrl')]",
-					"functionKey": {
-						"type": "SecureString",
-						"value": "[parameters('AzureFunction1_functionKey')]"
-					},
-					"authentication": "MSI"
+					"url": "[parameters('LS_StorageAccount_Param_properties_typeProperties_url')]"
 				}
 			},
 			"dependsOn": []
