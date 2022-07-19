@@ -5,6 +5,10 @@
 			"DDD_FunctionApp": {
 				"type": "string",
 				"value": "ddd-metadatafunc-prd"
+			},
+			"DDD_KeyVault": {
+				"type": "string",
+				"value": "ddd-keyvault-prd"
 			}
 		}
 	},
