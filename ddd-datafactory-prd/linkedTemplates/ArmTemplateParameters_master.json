@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "ddd-datafactory-prd"
+		},
+		"AzureFunction1_functionKey": {
+			"value": ""
+		},
+		"AzureDataLakeStorage1_properties_typeProperties_url": {
+			"value": "@{concat('https://', linkedService().StorageAccount, '.dfs.core.windows.net')}"
+		},
+		"AzureFunction1_properties_typeProperties_functionAppUrl": {
+			"value": "https://ddd-metadatafunc-prd.azurewebsites.net"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}

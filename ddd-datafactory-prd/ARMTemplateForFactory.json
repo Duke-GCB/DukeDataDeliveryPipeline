@@ -1,0 +1,463 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "ddd-datafactory-prd"
+		},
+		"AzureFunction1_functionKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'functionKey' of 'AzureFunction1'"
+		},
+		"AzureDataLakeStorage1_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{concat('https://', linkedService().StorageAccount, '.dfs.core.windows.net')}"
+		},
+		"AzureFunction1_properties_typeProperties_functionAppUrl": {
+			"type": "string",
+			"defaultValue": "https://ddd-metadatafunc-prd.azurewebsites.net"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/DataDelivery')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies files from a core's container to their customer's container.",
+				"activities": [
+					{
+						"name": "Copy Data files to Recipient",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Create Manifest",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"preserve": [
+								"Attributes"
+							],
+							"skipErrorFile": {
+								"dataInconsistency": false
+							},
+							"validateDataConsistency": true
+						},
+						"inputs": [
+							{
+								"referenceName": "CoreProjectFolder",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileSystem": {
+										"value": "@pipeline().parameters.Source_FileSystem",
+										"type": "Expression"
+									},
+									"TopLevelFolder": {
+										"value": "@pipeline().parameters.Source_TopLevelFolder",
+										"type": "Expression"
+									},
+									"StorageAccount": {
+										"value": "@pipeline().parameters.Source_StorageAccount",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "CustomerProjectFolder",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileSystem": {
+										"value": "@pipeline().parameters.Sink_FileSystem",
+										"type": "Expression"
+									},
+									"TopLevelFolder": {
+										"value": "@pipeline().parameters.Sink_TopLevelFolder",
+										"type": "Expression"
+									},
+									"StorageAccount": {
+										"value": "@pipeline().parameters.Sink_StorageAccount",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Create Manifest",
+						"type": "AzureFunctionActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 1,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"functionName": "ReadManifest",
+							"method": "POST",
+							"headers": {},
+							"body": {
+								"storage_account": {
+									"value": "@pipeline().parameters.Source_StorageAccount",
+									"type": "Expression"
+								},
+								"file_system": {
+									"value": "@pipeline().parameters.Source_FileSystem",
+									"type": "Expression"
+								},
+								"path": {
+									"value": "@pipeline().parameters.Source_TopLevelFolder",
+									"type": "Expression"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureFunction1",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Notify DDD Success",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Copy Data files to Recipient",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.05:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@pipeline().parameters.Webhook_URL",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Authorization": {
+									"value": "@pipeline().parameters.Webhook_Authorization",
+									"type": "Expression"
+								}
+							},
+							"body": {
+								"transfer_uuid": {
+									"value": "@pipeline().parameters.Webhook_TransferUUID",
+									"type": "Expression"
+								},
+								"delivery_id": {
+									"value": "@pipeline().parameters.Webhook_DeliveryID",
+									"type": "Expression"
+								},
+								"manifest": {
+									"value": "@activity('Create Manifest').output.Response",
+									"type": "Expression"
+								}
+							},
+							"httpRequestTimeout": "00:05:00"
+						}
+					},
+					{
+						"name": "Notify DDD Copy Failure",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Copy Data files to Recipient",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.05:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@pipeline().parameters.Webhook_URL",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Authorization": {
+									"value": "@pipeline().parameters.Webhook_Authorization",
+									"type": "Expression"
+								}
+							},
+							"body": {
+								"transfer_uuid": {
+									"value": "@pipeline().parameters.Webhook_TransferUUID",
+									"type": "Expression"
+								},
+								"delivery_id": {
+									"value": "@pipeline().parameters.Webhook_DeliveryID",
+									"type": "Expression"
+								},
+								"error_message": {
+									"value": "Copy Data Activity Failed",
+									"type": "Expression"
+								}
+							},
+							"httpRequestTimeout": "00:05:00"
+						}
+					},
+					{
+						"name": "Notify DDD Manifest Failure",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Create Manifest",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.05:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@pipeline().parameters.Webhook_URL",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Authorization": {
+									"value": "@pipeline().parameters.Webhook_Authorization",
+									"type": "Expression"
+								}
+							},
+							"body": {
+								"transfer_uuid": {
+									"value": "@pipeline().parameters.Webhook_TransferUUID",
+									"type": "Expression"
+								},
+								"delivery_id": {
+									"value": "@pipeline().parameters.Webhook_DeliveryID",
+									"type": "Expression"
+								},
+								"error_message": {
+									"value": "Manifest Creation Activity Failed",
+									"type": "Expression"
+								}
+							},
+							"httpRequestTimeout": "00:05:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"Source_FileSystem": {
+						"type": "string"
+					},
+					"Source_TopLevelFolder": {
+						"type": "string"
+					},
+					"Sink_FileSystem": {
+						"type": "string"
+					},
+					"Sink_TopLevelFolder": {
+						"type": "string"
+					},
+					"Source_StorageAccount": {
+						"type": "string"
+					},
+					"Sink_StorageAccount": {
+						"type": "string"
+					},
+					"Webhook_URL": {
+						"type": "string"
+					},
+					"Webhook_Authorization": {
+						"type": "string"
+					},
+					"Webhook_DeliveryID": {
+						"type": "string"
+					},
+					"Webhook_TransferUUID": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-06-30T18:29:23Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/CoreProjectFolder')]",
+				"[concat(variables('factoryId'), '/datasets/CustomerProjectFolder')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureFunction1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CoreProjectFolder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FileSystem": {
+						"type": "string"
+					},
+					"TopLevelFolder": {
+						"type": "string"
+					},
+					"StorageAccount": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@dataset().TopLevelFolder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().FileSystem",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CustomerProjectFolder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FileSystem": {
+						"type": "string"
+					},
+					"TopLevelFolder": {
+						"type": "string"
+					},
+					"StorageAccount": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@dataset().TopLevelFolder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().FileSystem",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDataLakeStorage1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"StorageAccount": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('AzureDataLakeStorage1_properties_typeProperties_url')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureFunction1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureFunction",
+				"typeProperties": {
+					"functionAppUrl": "[parameters('AzureFunction1_properties_typeProperties_functionAppUrl')]",
+					"functionKey": {
+						"type": "SecureString",
+						"value": "[parameters('AzureFunction1_functionKey')]"
+					},
+					"authentication": "MSI"
+				}
+			},
+			"dependsOn": []
+		}
+	]
+}
